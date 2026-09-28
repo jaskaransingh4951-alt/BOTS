@@ -1,0 +1,95 @@
+from telegram import Update
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
+
+import os
+
+BOT_TOKEN = os.getenv("8840138846:AAGXTx13QTWmd-W0opmPK7gqVX1lb4IRyVw")
+ADMIN_ID = 5907200145
+
+WELCOME_MESSAGE = """👋 Welcome!
+
+Goagame ki game uid send kro bro or hack se id bnao
+and reply ka wait kro...
+"""
+
+message_map = {}
+
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(WELCOME_MESSAGE)
+
+
+async def user_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+
+    await context.bot.send_message(
+        chat_id=ADMIN_ID,
+        text=(
+            "📩 NEW MESSAGE\n\n"
+            f"Name: {user.full_name}\n"
+            f"User ID: {user.id}\n"
+            f"Username: @{user.username or 'N/A'}"
+        ),
+    )
+
+    copied = await context.bot.copy_message(
+        chat_id=ADMIN_ID,
+        from_chat_id=update.effective_chat.id,
+        message_id=update.message.message_id,
+    )
+
+    message_map[copied.message_id] = update.effective_chat.id
+
+
+async def admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_chat.id != ADMIN_ID:
+        return
+
+    if not update.message.reply_to_message:
+        return
+
+    original_id = update.message.reply_to_message.message_id
+    user_chat_id = message_map.get(original_id)
+
+    if not user_chat_id:
+        await update.message.reply_text("⚠️ User mapping nahi mila.")
+        return
+
+    await context.bot.copy_message(
+        chat_id=user_chat_id,
+        from_chat_id=ADMIN_ID,
+        message_id=update.message.message_id,
+    )
+
+
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+
+    app.add_handler(
+        MessageHandler(
+            filters.Chat(ADMIN_ID) & filters.REPLY,
+            admin_reply,
+        )
+    )
+
+    app.add_handler(
+        MessageHandler(
+            filters.ChatType.PRIVATE & ~filters.COMMAND,
+            user_message,
+        )
+    )
+
+    print("🤖 Bot is running...")
+    app.run_polling()
+
+
+if __name__ == "__main__":
+    main()
